@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BLUEDOL · Vendor Orders</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg:#F2F5FB;--surface:#FFFFFF;--surface2:#EEF3FA;--border:#D4DDE8;
+  --text:#1A2B3C;--text2:#4A5D72;--text3:#8A9BAD;
+  --accent:#2563EB;--accent-light:#EBF2FF;
+  --green:#16A34A;--green-light:#DCFCE7;
+  --amber:#D97706;--amber-light:#FEF3C7;
+  --red:#DC2626;--red-light:#FEE2E2;
+  --purple:#7C3AED;--purple-light:#EDE9FE;
+  --hdr:#0F1C2E;
+  --radius:14px;--radius-sm:9px;
+  --shadow:0 1px 3px rgba(26,43,60,.07),0 4px 14px rgba(26,43,60,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
+
+/* HEADER */
+.app-header{background:var(--hdr);padding:0 16px;position:sticky;top:0;z-index:200;height:54px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:20px;font-weight:900;letter-spacing:1.5px;color:#fff;display:flex;align-items:center}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:3px}
+.sync-badge{font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;transition:all .3s}
+.sync-badge.saving{background:rgba(37,99,235,.3);color:#93C5FD}
+.sync-badge.saved{background:rgba(22,163,74,.25);color:#6EE7A8}
+.sync-badge.error{background:rgba(220,38,38,.25);color:#FCA5A5}
+.sync-badge.loading{background:rgba(255,255,255,.1);color:rgba(255,255,255,.6)}
+
+/* TABS */
+.tabs{display:flex;background:var(--hdr);border-bottom:1px solid rgba(255,255,255,.08);padding:0 16px;gap:4px}
+.tab{padding:9px 14px;font-size:13px;font-weight:600;color:rgba(255,255,255,.45);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .15s}
+.tab.active{color:#fff;border-bottom-color:var(--accent)}
+
+/* MAIN */
+.main{padding:14px;padding-bottom:90px}
+
+/* FILTER */
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.filter-bar::-webkit-scrollbar{display:none}
+.filter-btn{flex-shrink:0;padding:7px 14px;border:1.5px solid var(--border);border-radius:99px;background:var(--surface);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer}
+.filter-btn.active{border-color:var(--accent);background:var(--accent-light);color:var(--accent)}
+
+/* ORDER CARD */
+.order-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+.oc-header{padding:14px 16px 10px;display:flex;align-items:flex-start;gap:10px}
+.oc-meta{flex:1;min-width:0}
+.oc-vendor{font-size:16px;font-weight:800;color:var(--text)}
+.oc-date{font-size:12px;color:var(--text3);margin-top:2px}
+.oc-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.oc-stat{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px}
+.oc-actions{padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap}
+.prog-wrap{margin:4px 16px 12px}
+.prog-label{display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.prog-bar{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;border-radius:99px;background:var(--green);transition:width .4s}
+
+/* PILL */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill-pending{background:var(--amber-light);color:var(--amber)}
+.pill-partial{background:var(--purple-light);color:var(--purple)}
+.pill-complete{background:var(--green-light);color:var(--green)}
+
+/* LOADING SCREEN */
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;gap:16px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;color:var(--text3);font-weight:500}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:52px 24px;color:var(--text3)}
+.empty-icon{font-size:46px;margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px}
+.empty-sub{font-size:13px;line-height:1.6}
+
+/* FAB */
+.fab{position:fixed;bottom:22px;right:18px;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 18px rgba(37,99,235,.45);display:flex;align-items:center;justify-content:center;z-index:200;transition:transform .15s}
+.fab:active{transform:scale(.91)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,18,30,.55);z-index:300;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .22s}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal{background:var(--bg);border-radius:20px 20px 0 0;width:100%;max-height:95vh;overflow-y:auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.32,.72,0,1)}
+.modal-overlay.show .modal{transform:translateY(0)}
+.modal-handle{width:38px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 0}
+.modal-header{background:var(--hdr);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.modal-title{font-size:16px;font-weight:800;color:#fff}
+.modal-close{background:rgba(255,255,255,.1);border:none;border-radius:50%;width:30px;height:30px;font-size:15px;cursor:pointer;color:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center}
+
+/* ORDER INFO BAR */
+.order-info-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* FORM */
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px}
+.req{color:var(--accent)}
+input[type=text],input[type=date],input[type=number],select,textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:15px;color:var(--text);background:var(--surface);outline:none;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234A5D72' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+textarea{resize:none;min-height:60px}
+.sec-label{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+
+/* PRODUCTS */
+.products-section{padding:14px 16px 0}
+.products-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.products-count{font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-light);padding:3px 10px;border-radius:99px}
+
+/* PRODUCT CARD */
+.product-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(26,43,60,.05)}
+.product-card.expanded{border-color:var(--accent)}
+.pc-header{padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.pc-header:active{background:var(--surface2)}
+.pc-num{width:26px;height:26px;border-radius:50%;background:var(--hdr);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.product-card.expanded .pc-num{background:var(--accent)}
+.pc-info{flex:1;min-width:0}
+.pc-name{font-size:14px;font-weight:700;color:var(--text)}
+.pc-sub{font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-del{background:var(--red-light);border:none;border-radius:7px;color:var(--red);width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0}
+.pc-chevron{color:var(--text3);font-size:12px;transition:transform .2s;flex-shrink:0}
+.product-card.expanded .pc-chevron{transform:rotate(180deg)}
+.product-body{display:none;padding:0 14px 14px;border-top:1px solid var(--border)}
+.product-card.expanded .product-body{display:block;padding-top:12px}
+
+/* QTY PROGRESS */
+.qty-progress{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px}
+.qty-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.qty-label{font-size:11px;font-weight:700;color:var(--text2)}
+.qty-nums{font-size:13px;font-weight:800;color:var(--text)}
+.qty-bar-wrap{height:8px;background:var(--border);border-radius:99px;overflow:hidden}
+.qty-bar-fill{height:100%;border-radius:99px;transition:width .4s}
+.qty-legend{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap}
+.qty-leg-item{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--text2)}
+.qty-leg-dot{width:8px;height:8px;border-radius:50%}
+
+/* DELIVERY LOG */
+.delivery-log{margin-bottom:12px}
+.delivery-log-label{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.delivery-entry{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.delivery-entry-date{font-size:12px;font-weight:700;color:var(--text);min-width:80px}
+.delivery-entry-qty{font-size:13px;font-weight:800;color:var(--green);background:var(--green-light);padding:3px 10px;border-radius:99px;white-space:nowrap}
+.delivery-entry-note{font-size:11px;color:var(--text3);flex:1}
+.delivery-del-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:2px 6px}
+
+/* ADD DELIVERY */
+.add-delivery{background:var(--green-light);border:1.5px solid var(--green);border-radius:var(--radius-sm);padding:11px 12px;margin-bottom:8px}
+.add-delivery-title{font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px}
+.btn-add-delivery{background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px;font-size:13px;font-weight:700;cursor:pointer;width:100%}
+.btn-add-delivery:active{background:#15803d}
+
+/* PRIORITY */
+.priority-group{display:flex;gap:6px}
+.priority-btn{flex:1;padding:9px 4px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;text-align:center;transition:all .15s}
+.priority-btn.sel-low{border-color:var(--green);background:var(--green-light);color:var(--green)}
+.priority-btn.sel-med{border-color:var(--amber);background:var(--amber-light);color:var(--amber)}
+.priority-btn.sel-high{border-color:var(--red);background:var(--red-light);color:var(--red)}
+
+/* IMAGE */
+.img-upload-area{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:18px 12px;text-align:center;cursor:pointer;background:var(--surface2);position:relative}
+.img-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.img-upload-icon{font-size:24px}
+.img-upload-text{font-size:13px;font-weight:600;color:var(--text2);margin-top:4px}
+.img-upload-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.img-preview-wrap{position:relative;margin-top:8px}
+.img-preview{width:100%;max-height:160px;object-fit:cover;border-radius:var(--radius-sm);display:block}
+.img-remove{position:absolute;top:6px;right:6px;background:rgba(220,38,38,.88);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* ADD PRODUCT */
+.add-product-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:2px dashed var(--accent);border-radius:var(--radius);background:var(--accent-light);color:var(--accent);font-weight:700;font-size:14px;cursor:pointer;margin-bottom:14px}
+.add-product-btn:active{background:#dbeafe}
+
+/* MODAL FOOTER */
+.modal-footer{background:var(--surface);border-top:1px solid var(--border);padding:14px 16px 20px;display:flex;flex-direction:column;gap:10px}
+.btn-row{display:flex;gap:8px}
+
+/* BUTTONS */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:13px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;border:none;transition:all .15s;flex:1}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-success{background:var(--green);color:#fff}
+.btn-outline{background:var(--surface);color:var(--accent);border:1.5px solid var(--accent)}
+.btn-ghost{background:var(--surface2);color:var(--text2);border:1.5px solid var(--border)}
+.btn-danger-sm{background:var(--red-light);color:var(--red);border:1.5px solid #fca5a5}
+.btn-sm{padding:10px 14px;font-size:13px}
+.divider{border:none;border-top:1px solid var(--border);margin:12px 0}
+
+/* TOAST */
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--hdr);color:#fff;padding:10px 20px;border-radius:99px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .22s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(min-width:520px){
+  .modal{max-width:480px;margin:auto;border-radius:20px}
+  .modal-overlay{align-items:center}
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo">BLUEDOL<div class="logo-dot"></div></div>
+  <div class="sync-badge loading" id="syncBadge">⟳ Loading…</div>
+</header>
+<div class="tabs">
+  <div class="tab active" id="tab-orders">📋 Orders</div>
+  <div class="tab" id="tab-new" onclick="openNewOrder()">＋ New Order</div>
+</div>
+
+<div class="main">
+  <div id="view-orders">
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Pending</button>
+      <button class="filter-btn" onclick="setFilter('partial',this)">Partial</button>
+      <button class="filter-btn" onclick="setFilter('complete',this)">Completed</button>
+    </div>
+    <div id="ordersList">
+      <div class="loading-screen">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading orders…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button class="fab" onclick="openNewOrder()">＋</button>
+
+<!-- ORDER MODAL -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">New Order</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="order-info-bar">
+      <div class="row-2">
+        <div class="field" style="margin-bottom:0">
+          <label>Vendor <span class="req">*</span></label>
+          <select id="vendorSelect">
+            <option value="">Select vendor</option>
+            <option>Al-Noor Footwear</option>
+            <option>City Sole Works</option>
+            <option>Deccan Crafts</option>
+            <option>Elite Shoe Co.</option>
+            <option>Farooq Traders</option>
+            <option>Gulshan Footwear</option>
+            <option>Heritage Cobblers</option>
+            <option>Imperial Shoes</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Order Date <span class="req">*</span></label>
+          <input type="date" id="orderDate">
+        </div>
+      </div>
+    </div>
+    <div class="products-section">
+      <div class="products-header">
+        <div class="sec-label" style="margin-bottom:0">Products</div>
+        <span class="products-count" id="productsCount">0 products</span>
+      </div>
+      <div id="productsContainer"></div>
+      <div class="add-product-btn" onclick="addProduct()">＋ Add Product</div>
+    </div>
+    <div class="modal-footer">
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" id="btnDraft" onclick="saveOrderDraft()">💾 Save Draft</button>
+        <button class="btn btn-success btn-sm" id="btnComplete" onclick="completeOrder()">✔ Mark as Done</button>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="exportCurrentToPDF()">📄 Export PDF for Vendor</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ STATE ═══
+let orders = [];
+let currentOrderId = null;
+let productCount = 0;
+let activeFilter = 'all';
+
+// ═══ API ═══
+const API = '/api/orders';
+
+async function apiFetch(url, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ═══ INIT ═══
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('orderDate').value = today();
+  await loadOrders();
+});
+
+async function loadOrders() {
+  setSyncBadge('loading', '⟳ Loading…');
+  try {
+    orders = await apiFetch(API);
+    setSyncBadge('saved', '✓ Live');
+    renderOrders();
+  } catch(e) {
+    setSyncBadge('error', '✕ Offline');
+    showToast('⚠️ Cannot connect to server');
+    renderOrders();
+  }
+}
+
+// ═══ SYNC BADGE ═══
+function setSyncBadge(type, text) {
+  const b = document.getElementById('syncBadge');
+  b.className = 'sync-badge ' + type;
+  b.textContent = text;
+}
+
+// ═══ HELPERS ═══
+function today() { return new Date().toISOString().split('T')[0]; }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function calcProductStatus(product) {
+  const ordered = parseInt(product.qty) || 0;
+  const received = (product.deliveries || []).reduce((s,d) => s+(parseInt(d.qty)||0), 0);
+  const pending = Math.max(0, ordered - received);
+  return { ordered, received, pending,
+    status: received===0?'pending':received>=ordered?'complete':'partial' };
+}
+
+function orderSummaryStatus(order) {
+  if (order.manualComplete) return 'complete';
+  const prods = order.products || [];
+  if (!prods.length) return 'pending';
+  const statuses = prods.map(p => calcProductStatus(p).status);
+  if (statuses.every(s => s==='complete')) return 'complete';
+  if (statuses.some(s => s==='partial'||s==='complete')) return 'partial';
+  return 'pending';
+}
+
+// ═══ FILTER ═══
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderOrders();
+}
+
+// ═══ RENDER ORDERS ═══
+function renderOrders() {
+  const list = document.getElementById('ordersList');
+  let data = orders.filter(o => {
+    const st = orderSummaryStatus(o);
+    if (activeFilter==='pending') return st==='pending';
+    if (activeFilter==='partial') return st==='partial';
+    if (activeFilter==='complete') return st==='complete';
+    return true;
+  }).sort((a,b) => b.updatedAt - a.updatedAt);
+
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📦</div>
+      <div class="empty-title">No orders</div>
+      <div class="empty-sub">Tap <strong>＋ New Order</strong> to begin.</div>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = data.map(o => {
+    const prods = o.products || [];
+    const st = orderSummaryStatus(o);
+    const totOrd = prods.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+    const totRec = prods.reduce((s,p)=>s+(p.deliveries||[]).reduce((x,d)=>x+(parseInt(d.qty)||0),0),0);
+    const pct = totOrd>0 ? Math.round(totRec/totOrd*100) : 0;
+    const pillLabel = o.manualComplete ? 'Completed' : 'All Received';
+    const pill = st==='complete'
+      ? `<span class="pill pill-complete"><span class="pill-dot"></span>${pillLabel}</span>`
+      : st==='partial'
+      ? `<span class="pill pill-partial"><span class="pill-dot"></span>Partial</span>`
+      : `<span class="pill pill-pending"><span class="pill-dot"></span>Pending</span>`;
+
+    const prodMini = prods.map(p => {
+      const ps = calcProductStatus(p);
+      const color = ps.status==='complete'?'var(--green)':ps.status==='partial'?'var(--purple)':'var(--amber)';
+      return `<span class="oc-stat" style="background:${color}18;color:${color}">
+        <span style="width:6px;height:6px;border-radius:50%;background:${color};display:inline-block"></span>
+        ${p.article||'Item'}${ps.ordered?' · '+ps.received+'/'+ps.ordered:''}
+      </span>`;
+    }).join('');
+
+    return `<div class="order-card">
+      <div class="oc-header">
+        <div class="oc-meta">
+          <div class="oc-vendor">${o.vendor||'—'}</div>
+          <div class="oc-date">${fmtDate(o.date)} · ${prods.length} product${prods.length!==1?'s':''}</div>
+          <div class="oc-stats" style="margin-top:8px">${prodMini}</div>
+        </div>
+        <div>${pill}</div>
+      </div>
+      ${totOrd>0?`<div class="prog-wrap">
+        <div class="prog-label"><span>Delivery progress</span><span>${totRec}/${totOrd} pairs (${pct}%)</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+      </div>`:''}
+      <div class="oc-actions">
+        <button class="btn btn-outline btn-sm" style="flex:0;padding:9px 13px" onclick="editOrder('${o._id}')">✏️ Edit</button>
+        ${st!=='complete'?`<button class="btn btn-primary btn-sm" style="flex:0;padding:9px 13px" onclick="editOrder('${o._id}')">📥 Receive</button>`:''}
+        ${st==='complete'?`<button class="btn btn-ghost btn-sm" style="flex:0;padding:9px 13px" onclick="reopenOrder('${o._id}')">↩ Reopen</button>`:''}
+        <button class="btn btn-ghost btn-sm" style="flex:0;padding:9px 13px" onclick="exportOrderToPDF('${o._id}')">📄 PDF</button>
+        <button class="btn btn-danger-sm btn-sm" style="flex:0;padding:9px 11px" onclick="deleteOrder('${o._id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══ NEW ORDER ═══
+function openNewOrder() {
+  currentOrderId = null;
+  document.getElementById('modalTitle').textContent = 'New Order';
+  document.getElementById('vendorSelect').value = '';
+  document.getElementById('orderDate').value = today();
+  document.getElementById('productsContainer').innerHTML = '';
+  productCount = 0;
+  updateProductsCount();
+  addProduct();
+  showModal();
+}
+
+// ═══ EDIT ORDER ═══
+function editOrder(id) {
+  const order = orders.find(o => o._id === id);
+  if (!order) return;
+  currentOrderId = id;
+  document.getElementById('modalTitle').textContent = 'Edit / Track Order';
+  document.getElementById('vendorSelect').value = order.vendor || '';
+  document.getElementById('orderDate').value = order.date || today();
+  document.getElementById('productsContainer').innerHTML = '';
+  productCount = 0;
+  (order.products || []).forEach(p => addProduct(p));
+  updateProductsCount();
+  showModal();
+}
+
+// ═══ ADD PRODUCT ═══
+function addProduct(data = {}) {
+  productCount++;
+  const pid = data._pid || ('prod_' + genId());
+  data._pid = pid;
+  const container = document.getElementById('productsContainer');
+  const el = document.createElement('div');
+  el.className = 'product-card expanded';
+  el.id = pid;
+
+  const ps = calcProductStatus(data);
+  const statusPill = ps.ordered>0
+    ? ps.status==='complete'
+      ? `<span class="pill pill-complete" style="font-size:10px;padding:3px 8px">All Received</span>`
+      : ps.status==='partial'
+      ? `<span class="pill pill-partial" style="font-size:10px;padding:3px 8px">${ps.received}/${ps.ordered} pr</span>`
+      : `<span class="pill pill-pending" style="font-size:10px;padding:3px 8px">Not Received</span>`
+    : '';
+
+  el.innerHTML = `
+    <div class="pc-header" onclick="toggleProduct('${pid}')">
+      <div class="pc-num" id="${pid}_num">${productCount}</div>
+      <div class="pc-info">
+        <div class="pc-name" id="${pid}_nameLabel">${data.article||'New Product'}</div>
+        <div class="pc-sub" id="${pid}_subLabel">${buildSubLabel(data)}</div>
+      </div>
+      <div id="${pid}_statusPill">${statusPill}</div>
+      <button class="pc-del" onclick="event.stopPropagation();deleteProduct('${pid}')">🗑</button>
+      <span class="pc-chevron" id="${pid}_chev">▾</span>
+    </div>
+    <div class="product-body">
+      <div class="row-2">
+        <div class="field">
+          <label>Article / Name <span class="req">*</span></label>
+          <input type="text" id="${pid}_article" placeholder="e.g. Loafer 204" value="${data.article||''}"
+            oninput="updatePCLabel('${pid}')">
+        </div>
+        <div class="field">
+          <label>Color</label>
+          <input type="text" id="${pid}_color" placeholder="e.g. Black" value="${data.color||''}"
+            oninput="updatePCLabel('${pid}')">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Ordered Qty (pairs) <span class="req">*</span></label>
+          <input type="number" id="${pid}_qty" placeholder="0" value="${data.qty||''}"
+            min="0" inputmode="numeric" oninput="updatePCLabel('${pid}');updateQtyProgress('${pid}')">
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <div class="priority-group" id="${pid}_pg">
+            <button class="priority-btn ${data.priority==='Low'?'sel-low':''}" onclick="setPri('${pid}','Low',this)">Low</button>
+            <button class="priority-btn ${data.priority==='Medium'?'sel-med':''}" onclick="setPri('${pid}','Medium',this)">Med</button>
+            <button class="priority-btn ${data.priority==='High'?'sel-high':''}" onclick="setPri('${pid}','High',this)">High</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Required Sizes</label>
+        <input type="text" id="${pid}_sizes" placeholder="e.g. 6(5), 7(10), 8(15)" value="${data.sizes||''}">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Format: size(pairs) — e.g. 6(5), 7(10)</div>
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="${pid}_notes" placeholder="Special instructions…">${data.notes||''}</textarea>
+      </div>
+      <div class="field">
+        <label>Product Image</label>
+        <div class="img-upload-area" id="${pid}_imgArea">
+          <input type="file" accept="image/*" capture="environment" onchange="handleImg(event,'${pid}')">
+          ${data.image
+            ? `<div class="img-preview-wrap"><img src="${data.image}" class="img-preview" id="${pid}_img"><button class="img-remove" onclick="removeImg('${pid}')">✕</button></div>`
+            : `<div class="img-upload-icon">📷</div><div class="img-upload-text">Tap to take photo or upload</div><div class="img-upload-sub">Camera · Gallery · Files</div>`}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="sec-label">📥 Delivery Tracking</div>
+      <div class="qty-progress" id="${pid}_qtyProgress">
+        <div class="qty-row">
+          <span class="qty-label">Received vs Ordered</span>
+          <span class="qty-nums" id="${pid}_qtyNums">—</span>
+        </div>
+        <div class="qty-bar-wrap"><div class="qty-bar-fill" id="${pid}_qtyFill" style="width:0%;background:var(--green)"></div></div>
+        <div class="qty-legend">
+          <div class="qty-leg-item"><div class="qty-leg-dot" style="background:var(--green)"></div><span id="${pid}_legR">0 received</span></div>
+          <div class="qty-leg-item"><div class="qty-leg-dot" style="background:var(--amber)"></div><span id="${pid}_legP">0 pending</span></div>
+        </div>
+      </div>
+      <div class="delivery-log">
+        <div class="delivery-log-label">
+          <span>Delivery Entries</span>
+          <span id="${pid}_delivCount" style="font-size:11px;color:var(--text3)">0 entries</span>
+        </div>
+        <div id="${pid}_delivList">${renderDeliveriesHtml(pid, data.deliveries||[])}</div>
+      </div>
+      <div class="add-delivery">
+        <div class="add-delivery-title">＋ Record New Delivery</div>
+        <div class="row-2" style="margin-bottom:8px">
+          <div class="field" style="margin-bottom:0">
+            <label>Date <span class="req">*</span></label>
+            <input type="date" id="${pid}_dDate" value="${today()}">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Qty Received <span class="req">*</span></label>
+            <input type="number" id="${pid}_dQty" placeholder="0" min="1" inputmode="numeric">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label>Note (optional)</label>
+          <input type="text" id="${pid}_dNote" placeholder="e.g. Size 9 missing…">
+        </div>
+        <button class="btn-add-delivery" onclick="addDelivery('${pid}')">✓ Record This Delivery</button>
+      </div>
+    </div>`;
+  container.appendChild(el);
+  updateQtyProgress(pid, data.deliveries||[]);
+  updateDelivCount(pid, (data.deliveries||[]).length);
+  updateProductsCount();
+}
+
+function renderDeliveriesHtml(pid, deliveries) {
+  if (!deliveries.length) return `<div style="font-size:12px;color:var(--text3);padding:8px 0">No deliveries recorded yet.</div>`;
+  return deliveries.map((d,i) => `
+    <div class="delivery-entry">
+      <div class="delivery-entry-date">📅 ${fmtDate(d.date)}</div>
+      <div class="delivery-entry-qty">+${d.qty} pairs</div>
+      <div class="delivery-entry-note">${d.note||''}</div>
+      <button class="delivery-del-btn" onclick="removeDelivery('${pid}',${i})">✕</button>
+    </div>`).join('');
+}
+
+function buildSubLabel(data) {
+  const ps = calcProductStatus(data);
+  const parts = [];
+  if (data.color) parts.push(data.color);
+  if (data.qty) parts.push(data.qty+' ordered');
+  if (ps.received) parts.push(ps.received+' received');
+  return parts.join(' · ') || 'tap to fill details';
+}
+
+function updatePCLabel(pid) {
+  const article = (document.getElementById(pid+'_article')||{}).value||'New Product';
+  document.getElementById(pid+'_nameLabel').textContent = article;
+  updateQtyProgress(pid);
+}
+
+function updateQtyProgress(pid, deliveriesOverride) {
+  const ordered = parseInt((document.getElementById(pid+'_qty')||{}).value)||0;
+  // Get deliveries from current saved state or override
+  let deliveries = deliveriesOverride;
+  if (!deliveries) {
+    if (currentOrderId) {
+      const order = orders.find(o => o._id === currentOrderId);
+      const prod = order && (order.products||[]).find(p => p._pid===pid);
+      deliveries = prod ? (prod.deliveries||[]) : [];
+    } else deliveries = [];
+  }
+  const received = deliveries.reduce((s,d)=>s+(parseInt(d.qty)||0),0);
+  const pending = Math.max(0,ordered-received);
+  const pct = ordered>0 ? Math.min(100,Math.round(received/ordered*100)) : 0;
+  const color = pct>=100?'var(--green)':pct>0?'var(--purple)':'var(--amber)';
+
+  const fill=document.getElementById(pid+'_qtyFill');
+  if(fill){fill.style.width=pct+'%';fill.style.background=color;}
+  const nums=document.getElementById(pid+'_qtyNums');
+  if(nums) nums.textContent=ordered>0?`${received} / ${ordered} pairs (${pct}%)`:'—';
+  const legR=document.getElementById(pid+'_legR');
+  if(legR) legR.textContent=`${received} received`;
+  const legP=document.getElementById(pid+'_legP');
+  if(legP) legP.textContent=`${pending} pending`;
+
+  const subL=document.getElementById(pid+'_subLabel');
+  if(subL){
+    const col=(document.getElementById(pid+'_color')||{}).value||'';
+    const parts=[col,ordered?ordered+' ordered':'',received?received+' received':''].filter(Boolean);
+    subL.textContent=parts.join(' · ')||'tap to fill details';
+  }
+  const pillEl=document.getElementById(pid+'_statusPill');
+  if(pillEl && ordered>0){
+    const st=received===0?'pending':received>=ordered?'complete':'partial';
+    pillEl.innerHTML=st==='complete'
+      ?`<span class="pill pill-complete" style="font-size:10px;padding:3px 8px">All Received</span>`
+      :st==='partial'
+      ?`<span class="pill pill-partial" style="font-size:10px;padding:3px 8px">${received}/${ordered} pr</span>`
+      :`<span class="pill pill-pending" style="font-size:10px;padding:3px 8px">Not Received</span>`;
+  }
+}
+
+function updateDelivCount(pid, count) {
+  const el=document.getElementById(pid+'_delivCount');
+  if(el) el.textContent=count+' entr'+(count===1?'y':'ies');
+}
+
+// ═══ ADD DELIVERY ═══
+async function addDelivery(pid) {
+  if (!currentOrderId) { showToast('Save order first'); return; }
+  const date=(document.getElementById(pid+'_dDate')||{}).value;
+  const qty=parseInt((document.getElementById(pid+'_dQty')||{}).value)||0;
+  const note=(document.getElementById(pid+'_dNote')||{}).value||'';
+  if(!date){showToast('⚠️ Select a date');return;}
+  if(!qty||qty<=0){showToast('⚠️ Enter qty received');return;}
+
+  setSyncBadge('saving','⟳ Saving…');
+  try {
+    const order = orders.find(o=>o._id===currentOrderId);
+    if(!order) return;
+    const prod = (order.products||[]).find(p=>p._pid===pid);
+    if(!prod) return;
+    if(!prod.deliveries) prod.deliveries=[];
+    prod.deliveries.push({date,qty,note});
+    prod.deliveries.sort((a,b)=>a.date.localeCompare(b.date));
+
+    const updated = await apiFetch(`${API}/${currentOrderId}`, 'PUT', order);
+    const idx = orders.findIndex(o=>o._id===currentOrderId);
+    if(idx!==-1) orders[idx]=updated;
+
+    setSyncBadge('saved','✓ Saved');
+    showToast(`✓ +${qty} pairs recorded`);
+
+    const updProd=(updated.products||[]).find(p=>p._pid===pid);
+    const delivs=updProd?updProd.deliveries||[]:[];
+    const listEl=document.getElementById(pid+'_delivList');
+    if(listEl) listEl.innerHTML=renderDeliveriesHtml(pid,delivs);
+    updateDelivCount(pid,delivs.length);
+    updateQtyProgress(pid,delivs);
+
+    const dQty=document.getElementById(pid+'_dQty');
+    const dNote=document.getElementById(pid+'_dNote');
+    if(dQty) dQty.value='';
+    if(dNote) dNote.value='';
+  } catch(e) {
+    setSyncBadge('error','✕ Error');
+    showToast('⚠️ Failed to save');
+  }
+}
+
+async function removeDelivery(pid, idx) {
+  if(!confirm('Remove this delivery entry?')) return;
+  if(!currentOrderId) return;
+  setSyncBadge('saving','⟳ Saving…');
+  try {
+    const order=orders.find(o=>o._id===currentOrderId);
+    const prod=(order.products||[]).find(p=>p._pid===pid);
+    if(!prod||!prod.deliveries) return;
+    prod.deliveries.splice(idx,1);
+    const updated=await apiFetch(`${API}/${currentOrderId}`,'PUT',order);
+    const i=orders.findIndex(o=>o._id===currentOrderId);
+    if(i!==-1) orders[i]=updated;
+    setSyncBadge('saved','✓ Saved');
+    const updProd=(updated.products||[]).find(p=>p._pid===pid);
+    const delivs=updProd?updProd.deliveries||[]:[];
+    const listEl=document.getElementById(pid+'_delivList');
+    if(listEl) listEl.innerHTML=renderDeliveriesHtml(pid,delivs);
+    updateDelivCount(pid,delivs.length);
+    updateQtyProgress(pid,delivs);
+    showToast('Entry removed');
+  } catch(e) {
+    setSyncBadge('error','✕ Error');
+    showToast('⚠️ Failed to save');
+  }
+}
+
+// ═══ TOGGLE PRODUCT ═══
+function toggleProduct(pid) {
+  const card=document.getElementById(pid);
+  const exp=card.classList.toggle('expanded');
+  document.getElementById(pid+'_chev').textContent=exp?'▾':'▸';
+}
+
+function deleteProduct(pid) {
+  if(document.querySelectorAll('#productsContainer .product-card').length<=1){showToast('⚠️ At least 1 product required');return;}
+  document.getElementById(pid).remove();
+  reNumberProducts(); updateProductsCount();
+  showToast('Product removed');
+}
+
+function reNumberProducts() {
+  document.querySelectorAll('#productsContainer .product-card').forEach((c,i)=>{
+    const n=c.querySelector('[id$="_num"]'); if(n) n.textContent=i+1;
+  });
+}
+
+function updateProductsCount() {
+  const n=document.querySelectorAll('#productsContainer .product-card').length;
+  document.getElementById('productsCount').textContent=n+' product'+(n!==1?'s':'');
+}
+
+// ═══ PRIORITY ═══
+function setPri(pid,level,btn) {
+  document.getElementById(pid+'_pg').querySelectorAll('.priority-btn').forEach(b=>b.className='priority-btn');
+  btn.classList.add(level==='Low'?'sel-low':level==='Medium'?'sel-med':'sel-high');
+}
+function getPri(pid) {
+  const pg=document.getElementById(pid+'_pg'); if(!pg) return '';
+  const s=pg.querySelector('.priority-btn[class*="sel-"]'); if(!s) return '';
+  if(s.classList.contains('sel-low')) return 'Low';
+  if(s.classList.contains('sel-med')) return 'Medium';
+  return 'High';
+}
+
+// ═══ IMAGE ═══
+function handleImg(e,pid) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    document.getElementById(pid+'_imgArea').innerHTML=
+      `<input type="file" accept="image/*" capture="environment" onchange="handleImg(event,'${pid}')">
+       <div class="img-preview-wrap"><img src="${ev.target.result}" class="img-preview" id="${pid}_img">
+       <button class="img-remove" onclick="removeImg('${pid}')">✕</button></div>`;
+  };
+  reader.readAsDataURL(file);
+}
+function removeImg(pid) {
+  document.getElementById(pid+'_imgArea').innerHTML=
+    `<input type="file" accept="image/*" capture="environment" onchange="handleImg(event,'${pid}')">
+     <div class="img-upload-icon">📷</div><div class="img-upload-text">Tap to take photo or upload</div>
+     <div class="img-upload-sub">Camera · Gallery · Files</div>`;
+}
+
+// ═══ COLLECT PRODUCTS ═══
+function collectProducts() {
+  return Array.from(document.querySelectorAll('#productsContainer .product-card')).map(card=>{
+    const pid=card.id;
+    const imgEl=document.getElementById(pid+'_img');
+    const image=imgEl&&imgEl.src&&!imgEl.src.endsWith('#')?imgEl.src:'';
+    let deliveries=[];
+    if(currentOrderId){
+      const order=orders.find(o=>o._id===currentOrderId);
+      const saved=order&&(order.products||[]).find(p=>p._pid===pid);
+      if(saved) deliveries=saved.deliveries||[];
+    }
+    return {
+      _pid:pid,
+      article:(document.getElementById(pid+'_article')||{}).value||'',
+      color:(document.getElementById(pid+'_color')||{}).value||'',
+      qty:(document.getElementById(pid+'_qty')||{}).value||'',
+      sizes:(document.getElementById(pid+'_sizes')||{}).value||'',
+      notes:(document.getElementById(pid+'_notes')||{}).value||'',
+      priority:getPri(pid), image, deliveries,
+    };
+  });
+}
+
+// ═══ SAVE ═══
+async function saveOrderDraft() {
+  const vendor=document.getElementById('vendorSelect').value;
+  if(!vendor){showToast('⚠️ Select a vendor first');return;}
+  await persistOrder(false);
+  showToast('✓ Draft saved');
+}
+
+async function completeOrder() {
+  const vendor=document.getElementById('vendorSelect').value;
+  if(!vendor){showToast('⚠️ Select a vendor first');return;}
+  await persistOrder(true);
+  closeModal();
+  showToast('✅ Order marked complete!');
+}
+
+async function persistOrder(markComplete) {
+  const vendor=document.getElementById('vendorSelect').value;
+  const date=document.getElementById('orderDate').value;
+  const products=collectProducts();
+  setSyncBadge('saving','⟳ Saving…');
+  try {
+    let updated;
+    if(currentOrderId){
+      const existing=orders.find(o=>o._id===currentOrderId);
+      const payload={vendor,date,products,
+        manualComplete: markComplete ? true : (existing?existing.manualComplete:false),
+        updatedAt:Date.now()};
+      updated=await apiFetch(`${API}/${currentOrderId}`,'PUT',payload);
+      const idx=orders.findIndex(o=>o._id===currentOrderId);
+      if(idx!==-1) orders[idx]=updated;
+    } else {
+      const payload={vendor,date,products,manualComplete:markComplete,createdAt:Date.now(),updatedAt:Date.now()};
+      updated=await apiFetch(API,'POST',payload);
+      currentOrderId=updated._id;
+      orders.unshift(updated);
+    }
+    setSyncBadge('saved','✓ Saved');
+    renderOrders();
+    return updated;
+  } catch(e) {
+    setSyncBadge('error','✕ Error');
+    showToast('⚠️ Failed to save — check connection');
+    throw e;
+  }
+}
+
+// ═══ REOPEN / DELETE ═══
+async function reopenOrder(id) {
+  try {
+    setSyncBadge('saving','⟳ Saving…');
+    const order=orders.find(o=>o._id===id);
+    const updated=await apiFetch(`${API}/${id}`,'PUT',{...order,manualComplete:false,updatedAt:Date.now()});
+    const idx=orders.findIndex(o=>o._id===id);
+    if(idx!==-1) orders[idx]=updated;
+    setSyncBadge('saved','✓ Saved');
+    showToast('↩ Order reopened');
+    renderOrders();
+  } catch(e){ setSyncBadge('error','✕ Error'); }
+}
+
+async function deleteOrder(id) {
+  if(!confirm('Delete this order? Cannot be undone.')) return;
+  try {
+    setSyncBadge('saving','⟳ Saving…');
+    await apiFetch(`${API}/${id}`,'DELETE');
+    orders=orders.filter(o=>o._id!==id);
+    setSyncBadge('saved','✓ Saved');
+    showToast('🗑 Deleted');
+    renderOrders();
+  } catch(e){ setSyncBadge('error','✕ Error'); showToast('⚠️ Failed to delete'); }
+}
+
+// ═══ MODAL ═══
+function showModal(){document.getElementById('orderModal').classList.add('show');document.body.style.overflow='hidden';}
+function closeModal(){document.getElementById('orderModal').classList.remove('show');document.body.style.overflow='';renderOrders();}
+document.getElementById('orderModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+// ═══ TOAST ═══
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+// ═══ PDF ═══
+function exportCurrentToPDF() {
+  const vendor=document.getElementById('vendorSelect').value||'Vendor';
+  const date=document.getElementById('orderDate').value||today();
+  const products=collectProducts();
+  generatePDF({vendor,date,products,manualComplete:false});
+}
+function exportOrderToPDF(id){
+  const o=orders.find(x=>x._id===id);
+  if(o) generatePDF(o);
+}
+
+async function generatePDF(order) {
+  showToast('⏳ Building PDF…');
+  const {jsPDF} = window.jspdf;
+
+  // ── A5 portrait — perfect mobile viewing (148×210mm) ──
+  const doc = new jsPDF({unit:'mm', format:'a5', orientation:'portrait'});
+  const W = 148, H = 210, M = 10;
+  let y = 0;
+
+  // colours
+  const C = {
+    hdr:   [15,  28,  46],
+    acc:   [37,  99,  235],
+    text:  [26,  43,  60],
+    text2: [74,  93,  114],
+    text3: [138, 155, 173],
+    border:[200, 212, 224],
+    rowA:  [255, 255, 255],
+    rowB:  [246, 249, 253],
+    green: [22,  163, 74],
+    greenL:[220, 252, 231],
+    amber: [217, 119, 6],
+    amberL:[254, 243, 199],
+    red:   [220, 38,  38],
+    purple:[124, 58,  237],
+    purpleL:[237,233,254],
+  };
+
+  function setFont(size, style='normal', color=C.text) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style);
+    doc.setTextColor(...color);
+  }
+
+  function newPage() {
+    doc.addPage();
+    y = 12;
+    // subtle top border on continuation pages
+    doc.setFillColor(...C.hdr);
+    doc.rect(0, 0, W, 8, 'F');
+    setFont(7,'bold',[180,196,216]);
+    doc.text('BLUEDOL · Vendor Order', M, 5.5);
+    doc.text(order.vendor||'', W-M, 5.5, {align:'right'});
+    y = 14;
+  }
+
+  function checkPage(need) {
+    if (y + need > H - 10) newPage();
+  }
+
+  // ════════════════════════════════
+  // PAGE 1 HEADER
+  // ════════════════════════════════
+  doc.setFillColor(...C.hdr);
+  doc.rect(0, 0, W, 28, 'F');
+
+  // Logo
+  setFont(18, 'bold', [255,255,255]);
+  doc.text('BLUEDOL', M, 14);
+  // Blue dot after logo
+  doc.setFillColor(...C.acc);
+  doc.circle(M + doc.getTextWidth('BLUEDOL') + 2, 11, 1.8, 'F');
+
+  setFont(8, 'normal', [180,196,216]);
+  doc.text('Vendor Order Sheet', W-M, 10, {align:'right'});
+  doc.text('Generated: ' + new Date().toLocaleDateString('en-IN'), W-M, 16, {align:'right'});
+
+  y = 34;
+
+  // ── Vendor info box ──
+  doc.setFillColor(238,243,252);
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, W-2*M, 22, 2, 2, 'FD');
+
+  setFont(13,'bold', C.text);
+  doc.text(order.vendor||'—', M+4, y+8);
+
+  setFont(8,'normal', C.text2);
+  doc.text('Order Date:', M+4, y+15);
+  setFont(8,'bold', C.text);
+  doc.text(fmtDate(order.date), M+26, y+15);
+
+  const prods = order.products || [];
+  const totOrd = prods.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
+  const totRec = prods.reduce((s,p)=>s+(p.deliveries||[]).reduce((x,d)=>x+(parseInt(d.qty)||0),0),0);
+  const totPend = Math.max(0, totOrd - totRec);
+
+  setFont(8,'normal', C.text2);
+  doc.text('Products:', M+65, y+15);
+  setFont(8,'bold', C.text);
+  doc.text(String(prods.length), M+83, y+15);
+
+  y += 28;
+
+  // ── Summary strip ──
+  // 3-box summary row
+  const bw = (W - 2*M) / 3;
+  const summaryData = [
+    {label:'Total Ordered', val: totOrd+' pairs', bg:[238,243,252], valColor:C.text},
+    {label:'Received',      val: totRec+' pairs', bg:C.greenL,      valColor:C.green},
+    {label:'Pending',       val: totPend+' pairs',bg:C.amberL,      valColor:C.amber},
+  ];
+  summaryData.forEach((s,i) => {
+    doc.setFillColor(...s.bg);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.3);
+    doc.rect(M + i*bw, y, bw, 14, 'FD');
+    setFont(7,'normal', C.text3);
+    doc.text(s.label, M + i*bw + bw/2, y+5, {align:'center'});
+    setFont(10,'bold', s.valColor);
+    doc.text(s.val, M + i*bw + bw/2, y+11, {align:'center'});
+  });
+  y += 18;
+
+  // ════════════════════════════════
+  // PRODUCTS — each as a card/grid
+  // ════════════════════════════════
+  for (let i=0; i<prods.length; i++) {
+    const p = prods[i];
+    const ps = calcProductStatus(p);
+    const delivs = p.deliveries || [];
+
+    // Estimate card height to check page
+    const hasImg = p.image && p.image.startsWith('data:image');
+    const imgH = hasImg ? 38 : 0;
+    const delivRowH = delivs.length * 7;
+    const cardH = 10 + 28 + (p.sizes?8:0) + (p.notes?8:0) + (delivs.length?delivRowH+12:8) + imgH + 6;
+    checkPage(cardH);
+
+    const cx = M, cw = W - 2*M;
+
+    // ── Card outer border ──
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.4);
+    doc.setFillColor(255,255,255);
+    doc.roundedRect(cx, y, cw, cardH, 2, 2, 'FD');
+
+    // ── Card header bar (dark) ──
+    doc.setFillColor(...C.hdr);
+    doc.roundedRect(cx, y, cw, 10, 2, 2, 'F');
+    doc.rect(cx, y+6, cw, 4, 'F'); // square bottom corners
+
+    // Product number circle
+    doc.setFillColor(...C.acc);
+    doc.circle(cx+6, y+5, 3.5, 'F');
+    setFont(7,'bold',[255,255,255]);
+    doc.text(String(i+1), cx+6, y+6.5, {align:'center'});
+
+    // Product name
+    setFont(9,'bold',[255,255,255]);
+    doc.text(p.article||'Product', cx+13, y+6.5);
+
+    // Status badge
+    const stBg = ps.status==='complete'?C.green:ps.status==='partial'?C.purple:C.amber;
+    const stTxt = ps.status==='complete'?'RECEIVED':ps.status==='partial'?'PARTIAL':'PENDING';
+    const badgeW = 22, badgeX = cx+cw-badgeW-2;
+    doc.setFillColor(...stBg);
+    doc.roundedRect(badgeX, y+2.5, badgeW, 5.5, 1.5, 1.5, 'F');
+    setFont(6,'bold',[255,255,255]);
+    doc.text(stTxt, badgeX+badgeW/2, y+6.5, {align:'center'});
+
+    let ry = y + 12; // row y inside card
+
+    // ── IMAGE + DETAILS side by side ──
+    if (hasImg) {
+      // Image on the LEFT
+      const imgW = 36, imgBoxH = 34;
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.2);
+      try {
+        const fmt = p.image.startsWith('data:image/png')?'PNG':'JPEG';
+        doc.addImage(p.image, fmt, cx+2, ry, imgW, imgBoxH, undefined, 'MEDIUM');
+        doc.rect(cx+2, ry, imgW, imgBoxH, 'S');
+      } catch(e) {
+        doc.rect(cx+2, ry, imgW, imgBoxH, 'S');
+        setFont(7,'normal',C.text3);
+        doc.text('No Image', cx+2+imgW/2, ry+imgBoxH/2, {align:'center'});
+      }
+
+      // Details grid on the RIGHT
+      const dx = cx + imgW + 4;
+      const dw = cw - imgW - 6;
+      const rows = [
+        ['Color',   p.color||'—'],
+        ['Ordered', (p.qty||'—')+' pairs'],
+        ['Received',ps.received+' pairs'],
+        ['Pending', ps.pending+' pairs'],
+      ];
+      rows.forEach((r, ri) => {
+        const rowY = ry + ri*8;
+        if(ri%2===1){doc.setFillColor(...C.rowB);}else{doc.setFillColor(...C.rowA);}
+        doc.rect(dx, rowY, dw, 8, 'F');
+        doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+        doc.line(dx, rowY+8, dx+dw, rowY+8);
+        setFont(7,'normal',C.text3);
+        doc.text(r[0], dx+2, rowY+5.5);
+        const valColor = r[0]==='Received'?C.green:r[0]==='Pending'&&ps.pending>0?C.amber:C.text;
+        setFont(7,'bold',valColor);
+        doc.text(String(r[1]), dx+dw-2, rowY+5.5, {align:'right'});
+      });
+      // vertical divider between image and grid
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.2);
+      doc.line(dx-1, ry, dx-1, ry+imgBoxH);
+      ry += imgBoxH + 2;
+    } else {
+      // No image — full-width 2-column grid
+      const cols = [
+        ['Color',    p.color||'—',     'Ordered', (p.qty||'—')+' pairs'],
+        ['Received', ps.received+' pairs', 'Pending', ps.pending+' pairs'],
+      ];
+      const hw = cw/2;
+      cols.forEach((row, ri) => {
+        const rowY = ry + ri*8;
+        doc.setFillColor(ri%2===0?C.rowA:C.rowB);
+        doc.rect(cx, rowY, cw, 8, 'F');
+        doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+        doc.line(cx, rowY+8, cx+cw, rowY+8);
+        doc.line(cx+hw, rowY, cx+hw, rowY+8); // vertical mid divider
+
+        setFont(7,'normal',C.text3); doc.text(row[0], cx+2, rowY+5.5);
+        const v1Color = row[0]==='Received'?C.green:row[0]==='Pending'&&ps.pending>0?C.amber:C.text;
+        setFont(7,'bold',v1Color); doc.text(row[1], cx+hw-2, rowY+5.5, {align:'right'});
+
+        setFont(7,'normal',C.text3); doc.text(row[2], cx+hw+2, rowY+5.5);
+        const v2Color = row[2]==='Received'?C.green:row[2]==='Pending'&&ps.pending>0?C.amber:C.text;
+        setFont(7,'bold',v2Color); doc.text(row[3], cx+cw-2, rowY+5.5, {align:'right'});
+      });
+      ry += 18;
+    }
+
+    // ── Sizes row ──
+    if (p.sizes) {
+      doc.setFillColor(246,249,253);
+      doc.rect(cx, ry, cw, 8, 'F');
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+      doc.line(cx, ry+8, cx+cw, ry+8);
+      setFont(7,'normal',C.text3); doc.text('Sizes', cx+2, ry+5.5);
+      setFont(7,'bold',C.text);
+      const sizeTxt = doc.splitTextToSize(p.sizes, cw-30);
+      doc.text(sizeTxt[0]||'', cx+cw-2, ry+5.5, {align:'right'});
+      ry += 8;
+    }
+
+    // ── Priority row ──
+    if (p.priority) {
+      const priColor = {Low:C.green, Medium:C.amber, High:C.red}[p.priority];
+      doc.setFillColor(246,249,253);
+      doc.rect(cx, ry, cw, 8, 'F');
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+      doc.line(cx, ry+8, cx+cw, ry+8);
+      setFont(7,'normal',C.text3); doc.text('Priority', cx+2, ry+5.5);
+      doc.setFillColor(...priColor);
+      doc.roundedRect(cx+cw-22, ry+1.5, 20, 5, 1.5, 1.5, 'F');
+      setFont(7,'bold',[255,255,255]); doc.text(p.priority, cx+cw-12, ry+5.5, {align:'center'});
+      ry += 8;
+    }
+
+    // ── Notes row ──
+    if (p.notes) {
+      const noteTxt = doc.splitTextToSize(p.notes, cw-20);
+      const noteH = noteTxt.length * 4.5 + 5;
+      doc.setFillColor(255,253,235);
+      doc.rect(cx, ry, cw, noteH, 'F');
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+      doc.line(cx, ry+noteH, cx+cw, ry+noteH);
+      setFont(7,'normal',C.text3); doc.text('Notes', cx+2, ry+5.5);
+      setFont(7,'normal',C.text2); doc.text(noteTxt, cx+18, ry+5.5);
+      ry += noteH;
+    }
+
+    // ── Delivery table ──
+    if (delivs.length) {
+      // Table header
+      doc.setFillColor(...C.greenL);
+      doc.rect(cx, ry, cw, 7, 'F');
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+      doc.line(cx, ry+7, cx+cw, ry+7);
+
+      const col1=cw*0.38, col2=cw*0.22, col3=cw*0.40;
+      setFont(7,'bold',C.green);
+      doc.text('Date', cx+2, ry+5);
+      doc.text('Qty', cx+col1+2, ry+5);
+      doc.text('Note', cx+col1+col2+2, ry+5);
+      // column dividers in header
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+      doc.line(cx+col1, ry, cx+col1, ry+7);
+      doc.line(cx+col1+col2, ry, cx+col1+col2, ry+7);
+      ry += 7;
+
+      delivs.forEach((d, di) => {
+        const rowH = 7;
+        doc.setFillColor(di%2===0?255,255,255:246,249,253);
+        doc.rect(cx, ry, cw, rowH, 'F');
+        doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+        doc.line(cx, ry+rowH, cx+cw, ry+rowH);
+        doc.line(cx+col1, ry, cx+col1, ry+rowH);
+        doc.line(cx+col1+col2, ry, cx+col1+col2, ry+rowH);
+
+        setFont(7,'normal',C.text); doc.text(fmtDate(d.date), cx+2, ry+5);
+        setFont(7,'bold',C.green);  doc.text('+'+d.qty+' pr', cx+col1+2, ry+5);
+        setFont(7,'normal',C.text2);
+        const noteTxt = doc.splitTextToSize(d.note||'—', col3-4);
+        doc.text(noteTxt[0]||'—', cx+col1+col2+2, ry+5);
+        ry += rowH;
+      });
+    } else {
+      doc.setFillColor(250,250,252);
+      doc.rect(cx, ry, cw, 7, 'F');
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
+      doc.line(cx, ry+7, cx+cw, ry+7);
+      setFont(7,'italic',C.text3);
+      doc.text('No deliveries recorded yet', cx+cw/2, ry+5, {align:'center'});
+      ry += 7;
+    }
+
+    // outer card border on top of everything
+    doc.setDrawColor(...C.border); doc.setLineWidth(0.4);
+    doc.roundedRect(cx, y, cw, cardH, 2, 2, 'S');
+
+    y = ry + 6;
+  }
+
+  // ════════════════════════════════
+  // FOOTER SUMMARY BOX
+  // ════════════════════════════════
+  checkPage(22);
+  doc.setFillColor(...C.hdr);
+  doc.roundedRect(M, y, W-2*M, 18, 2, 2, 'F');
+  setFont(9,'bold',[255,255,255]);
+  doc.text('Order Summary', M+4, y+7);
+  setFont(8,'normal',[180,196,216]);
+  doc.text(`${prods.length} products  ·  ${totOrd} pairs ordered  ·  ${totRec} received  ·  ${totPend} pending`, M+4, y+14);
+
+  // ── Page numbers ──
+  const pages = doc.internal.getNumberOfPages();
+  for (let pg=1; pg<=pages; pg++) {
+    doc.setPage(pg);
+    setFont(7,'normal',C.text3);
+    doc.text('BLUEDOL Order System', M, H-4);
+    doc.text(`${pg} / ${pages}`, W-M, H-4, {align:'right'});
+  }
+
+  doc.save(`BLUEDOL_${(order.vendor||'Order').replace(/\s+/g,'_')}_${order.date||today()}.pdf`);
+  showToast('✅ PDF ready!');
+}
+</script>
+</body>
+</html>
