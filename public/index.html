@@ -1084,7 +1084,7 @@ async function generatePDF(order) {
       ];
       rows.forEach((r, ri) => {
         const rowY = ry + ri*8;
-        if(ri%2===1){doc.setFillColor(...C.rowB);}else{doc.setFillColor(...C.rowA);}
+        if(ri%2===1){doc.setFillColor(246,249,253);}else{doc.setFillColor(255,255,255);}
         doc.rect(dx, rowY, dw, 8, 'F');
         doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
         doc.line(dx, rowY+8, dx+dw, rowY+8);
@@ -1107,7 +1107,7 @@ async function generatePDF(order) {
       const hw = cw/2;
       cols.forEach((row, ri) => {
         const rowY = ry + ri*8;
-        doc.setFillColor(ri%2===0?C.rowA:C.rowB);
+        if(ri%2===0){doc.setFillColor(255,255,255);}else{doc.setFillColor(246,249,253);}
         doc.rect(cx, rowY, cw, 8, 'F');
         doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
         doc.line(cx, rowY+8, cx+cw, rowY+8);
@@ -1185,7 +1185,7 @@ async function generatePDF(order) {
 
       delivs.forEach((d, di) => {
         const rowH = 7;
-        doc.setFillColor(di%2===0?255,255,255:246,249,253);
+        if(di%2===0){doc.setFillColor(255,255,255);}else{doc.setFillColor(246,249,253);}
         doc.rect(cx, ry, cw, rowH, 'F');
         doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
         doc.line(cx, ry+rowH, cx+cw, ry+rowH);
