@@ -240,22 +240,21 @@ textarea{resize:none;min-height:60px}
       <div class="row-2">
         <div class="field" style="margin-bottom:0">
           <label>Vendor <span class="req">*</span></label>
-          <select id="vendorSelect">
+          <select id="vendorSelect" onchange="autoSave()">
             <option value="">Select vendor</option>
-           <option>Afroz - RT</option>
-            <option>AAfroz- TL</option>
-            <option>Bluedol Unit</option>
-            <option>Javid</option>
-            <option>Sayeedu</option>
-            <option></option>
-            <option>SHK - Machine Finishing</option>
-            <option>Fayaz</option>
-
+            <option>Al-Noor Footwear</option>
+            <option>City Sole Works</option>
+            <option>Deccan Crafts</option>
+            <option>Elite Shoe Co.</option>
+            <option>Farooq Traders</option>
+            <option>Gulshan Footwear</option>
+            <option>Heritage Cobblers</option>
+            <option>Imperial Shoes</option>
           </select>
         </div>
         <div class="field" style="margin-bottom:0">
           <label>Order Date <span class="req">*</span></label>
-          <input type="date" id="orderDate">
+          <input type="date" id="orderDate" onchange="autoSave()">
         </div>
       </div>
     </div>
@@ -486,19 +485,19 @@ function addProduct(data = {}) {
         <div class="field">
           <label>Article / Name <span class="req">*</span></label>
           <input type="text" id="${pid}_article" placeholder="e.g. Loafer 204" value="${data.article||''}"
-            oninput="updatePCLabel('${pid}')">
+            oninput="updatePCLabel('${pid}');autoSave()">
         </div>
         <div class="field">
           <label>Color</label>
           <input type="text" id="${pid}_color" placeholder="e.g. Black" value="${data.color||''}"
-            oninput="updatePCLabel('${pid}')">
+            oninput="updatePCLabel('${pid}');autoSave()">
         </div>
       </div>
       <div class="row-2">
         <div class="field">
           <label>Ordered Qty (pairs) <span class="req">*</span></label>
           <input type="number" id="${pid}_qty" placeholder="0" value="${data.qty||''}"
-            min="0" inputmode="numeric" oninput="updatePCLabel('${pid}');updateQtyProgress('${pid}')">
+            min="0" inputmode="numeric" oninput="updatePCLabel('${pid}');updateQtyProgress('${pid}');autoSave()">
         </div>
         <div class="field">
           <label>Priority</label>
@@ -511,12 +510,12 @@ function addProduct(data = {}) {
       </div>
       <div class="field">
         <label>Required Sizes</label>
-        <input type="text" id="${pid}_sizes" placeholder="e.g. 6(5), 7(10), 8(15)" value="${data.sizes||''}">
+        <input type="text" id="${pid}_sizes" placeholder="e.g. 6(5), 7(10), 8(15)" value="${data.sizes||''}" oninput="autoSave()">
         <div style="font-size:11px;color:var(--text3);margin-top:4px">Format: size(pairs) — e.g. 6(5), 7(10)</div>
       </div>
       <div class="field">
         <label>Notes</label>
-        <textarea id="${pid}_notes" placeholder="Special instructions…">${data.notes||''}</textarea>
+        <textarea id="${pid}_notes" placeholder="Special instructions…" oninput="autoSave()">${data.notes||''}</textarea>
       </div>
       <div class="field">
         <label>Product Image</label>
@@ -755,6 +754,7 @@ function updateProductsCount() {
 function setPri(pid,level,btn) {
   document.getElementById(pid+'_pg').querySelectorAll('.priority-btn').forEach(b=>b.className='priority-btn');
   btn.classList.add(level==='Low'?'sel-low':level==='Medium'?'sel-med':'sel-high');
+  autoSave();
 }
 function getPri(pid) {
   const pg=document.getElementById(pid+'_pg'); if(!pg) return '';
@@ -784,6 +784,7 @@ function handleImg(e, pid) {
     wrap.innerHTML = `<img src="${ev.target.result}" class="img-preview" id="${pid}_img">
       <button class="img-remove" onclick="removeImg('${pid}')">✕</button>`;
     area.insertBefore(wrap, btnRow);
+    autoSave();
   };
   reader.readAsDataURL(file);
 }
@@ -823,6 +824,19 @@ function collectProducts() {
       priority:getPri(pid), image, deliveries,
     };
   });
+}
+
+// ═══ AUTO SAVE ═══
+let _autoSaveTimer = null;
+function autoSave() {
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(async () => {
+    const vendor = document.getElementById('vendorSelect').value;
+    if (!vendor) return; // don't save if no vendor selected yet
+    try {
+      await persistOrder(false);
+    } catch(e) { /* silent fail on autosave */ }
+  }, 1500); // 1.5s debounce
 }
 
 // ═══ SAVE ═══
@@ -910,6 +924,41 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2600);
 }
 
+// ═══ IMAGE RESIZE FOR PDF ═══
+function resizeImageForPDF(dataUrl, maxW, maxH) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // Calculate aspect-ratio-correct size
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const ratio = Math.min(maxW / w, maxH / h);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      // White background (avoids transparent PNG issues in PDF)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// ═══ GET IMAGE DIMENSIONS ═══
+function getImageDims(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 // ═══ PDF ═══
 function exportCurrentToPDF() {
   const vendor=document.getElementById('vendorSelect').value||'Vendor';
@@ -971,297 +1020,171 @@ async function generatePDF(order) {
   function checkPage(need) {
     if (y + need > H - 10) newPage();
   }
-
   // ════════════════════════════════
-  // PAGE 1 HEADER
+  // SIMPLE TOP HEADER (compact)
   // ════════════════════════════════
   doc.setFillColor(...C.hdr);
-  doc.rect(0, 0, W, 28, 'F');
-
-  // Logo
-  setFont(18, 'bold', [255,255,255]);
-  doc.text('BLUEDOL', M, 14);
-  // Blue dot after logo
+  doc.rect(0, 0, W, 20, 'F');
+  setFont(15, 'bold', [255,255,255]);
+  doc.text('BLUEDOL', M, 10);
   doc.setFillColor(...C.acc);
-  doc.circle(M + doc.getTextWidth('BLUEDOL') + 2, 11, 1.8, 'F');
-
+  doc.circle(M + doc.getTextWidth('BLUEDOL') + 2, 7.5, 1.6, 'F');
   setFont(8, 'normal', [180,196,216]);
-  doc.text('Vendor Order Sheet', W-M, 10, {align:'right'});
-  doc.text('Generated: ' + new Date().toLocaleDateString('en-IN'), W-M, 16, {align:'right'});
+  doc.text(order.vendor||'—', W-M, 8, {align:'right'});
+  doc.text(fmtDate(order.date), W-M, 14, {align:'right'});
 
-  y = 34;
-
-  // ── Vendor info box ──
-  doc.setFillColor(238,243,252);
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(M, y, W-2*M, 22, 2, 2, 'FD');
-
-  setFont(13,'bold', C.text);
-  doc.text(order.vendor||'—', M+4, y+8);
-
-  setFont(8,'normal', C.text2);
-  doc.text('Order Date:', M+4, y+15);
-  setFont(8,'bold', C.text);
-  doc.text(fmtDate(order.date), M+26, y+15);
+  y = 25;
 
   const prods = order.products || [];
   const totOrd = prods.reduce((s,p)=>s+(parseInt(p.qty)||0),0);
   const totRec = prods.reduce((s,p)=>s+(p.deliveries||[]).reduce((x,d)=>x+(parseInt(d.qty)||0),0),0);
   const totPend = Math.max(0, totOrd - totRec);
 
-  setFont(8,'normal', C.text2);
-  doc.text('Products:', M+65, y+15);
+  // Compact one-line summary strip
+  doc.setFillColor(238,243,252);
+  doc.setDrawColor(...C.border); doc.setLineWidth(0.3);
+  doc.rect(M, y, W-2*M, 9, 'FD');
   setFont(8,'bold', C.text);
-  doc.text(String(prods.length), M+83, y+15);
-
-  y += 28;
-
-  // ── Summary strip ──
-  // 3-box summary row
-  const bw = (W - 2*M) / 3;
-  const summaryData = [
-    {label:'Total Ordered', val: totOrd+' pairs', bg:[238,243,252], valColor:C.text},
-    {label:'Received',      val: totRec+' pairs', bg:C.greenL,      valColor:C.green},
-    {label:'Pending',       val: totPend+' pairs',bg:C.amberL,      valColor:C.amber},
-  ];
-  summaryData.forEach((s,i) => {
-    doc.setFillColor(...s.bg);
-    doc.setDrawColor(...C.border);
-    doc.setLineWidth(0.3);
-    doc.rect(M + i*bw, y, bw, 14, 'FD');
-    setFont(7,'normal', C.text3);
-    doc.text(s.label, M + i*bw + bw/2, y+5, {align:'center'});
-    setFont(10,'bold', s.valColor);
-    doc.text(s.val, M + i*bw + bw/2, y+11, {align:'center'});
-  });
-  y += 18;
+  doc.text(`${prods.length} products`, M+3, y+6);
+  setFont(8,'bold', C.green);
+  doc.text(`${totRec} received`, M+(W-2*M)*0.42, y+6);
+  setFont(8,'bold', totPend>0?C.amber:C.text3);
+  doc.text(`${totPend} pending`, M+(W-2*M)*0.72, y+6);
+  y += 13;
 
   // ════════════════════════════════
-  // PRODUCTS — each as a card/grid
+  // PRODUCTS — large image, 2 per page, minimal noise
   // ════════════════════════════════
   for (let i=0; i<prods.length; i++) {
     const p = prods[i];
     const ps = calcProductStatus(p);
     const delivs = p.deliveries || [];
-
-    // Estimate card height to check page
     const hasImg = p.image && p.image.startsWith('data:image');
-    const imgH = hasImg ? 38 : 0;
-    const delivRowH = delivs.length * 7;
-    const cardH = 10 + 28 + (p.sizes?8:0) + (p.notes?8:0) + (delivs.length?delivRowH+12:8) + imgH + 6;
-    checkPage(cardH);
+
+    // Force exactly 2 products per page: start new page on every odd index (0-based: i=2,4,6...)
+    if (i > 0 && i % 2 === 0) newPage();
 
     const cx = M, cw = W - 2*M;
 
-    // ── Card outer border ──
-    doc.setDrawColor(...C.border);
-    doc.setLineWidth(0.4);
-    doc.setFillColor(255,255,255);
-    doc.roundedRect(cx, y, cw, cardH, 2, 2, 'FD');
+    // ── Big image first — this is the star of the card ──
+    const imgBoxH = 62; // large, clear image area
+    if (hasImg) {
+      doc.setFillColor(250,250,251);
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.4);
+      doc.rect(cx, y, cw, imgBoxH, 'FD');
+      try {
+        const sharp = await resizeImageForPDF(p.image, 900, 900);
+        // Determine drawn size preserving aspect ratio, centered in box
+        const dims = await getImageDims(sharp);
+        const scale = Math.min((cw-4)/dims.w, (imgBoxH-4)/dims.h);
+        const dw = dims.w*scale, dh = dims.h*scale;
+        const dx = cx + (cw-dw)/2, dy = y + (imgBoxH-dh)/2;
+        const fmt = sharp.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(sharp, fmt, dx, dy, dw, dh);
+      } catch(e) {
+        setFont(9,'normal',C.text3);
+        doc.text('Image unavailable', cx+cw/2, y+imgBoxH/2, {align:'center'});
+      }
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.4);
+      doc.rect(cx, y, cw, imgBoxH, 'S');
+      y += imgBoxH + 3;
+    }
 
-    // ── Card header bar (dark) ──
-    doc.setFillColor(...C.hdr);
-    doc.roundedRect(cx, y, cw, 10, 2, 2, 'F');
-    doc.rect(cx, y+6, cw, 4, 'F'); // square bottom corners
-
-    // Product number circle
-    doc.setFillColor(...C.acc);
-    doc.circle(cx+6, y+5, 3.5, 'F');
-    setFont(7,'bold',[255,255,255]);
-    doc.text(String(i+1), cx+6, y+6.5, {align:'center'});
-
-    // Product name
-    setFont(9,'bold',[255,255,255]);
-    doc.text(p.article||'Product', cx+13, y+6.5);
-
-    // Status badge
+    // ── Product name + status (single bold line, no header bar) ──
+    setFont(12,'bold', C.text);
+    doc.text(`${i+1}. ${p.article||'Product'}`, cx, y+5);
     const stBg = ps.status==='complete'?C.green:ps.status==='partial'?C.purple:C.amber;
     const stTxt = ps.status==='complete'?'RECEIVED':ps.status==='partial'?'PARTIAL':'PENDING';
-    const badgeW = 22, badgeX = cx+cw-badgeW-2;
+    const badgeW = 24;
     doc.setFillColor(...stBg);
-    doc.roundedRect(badgeX, y+2.5, badgeW, 5.5, 1.5, 1.5, 'F');
-    setFont(6,'bold',[255,255,255]);
-    doc.text(stTxt, badgeX+badgeW/2, y+6.5, {align:'center'});
+    doc.roundedRect(cx+cw-badgeW, y, badgeW, 6.5, 1.5, 1.5, 'F');
+    setFont(7,'bold',[255,255,255]);
+    doc.text(stTxt, cx+cw-badgeW/2, y+4.5, {align:'center'});
+    y += 10;
 
-    let ry = y + 12; // row y inside card
-
-    // ── IMAGE + DETAILS side by side ──
-    if (hasImg) {
-      // Image on the LEFT
-      const imgW = 36, imgBoxH = 34;
-      doc.setDrawColor(...C.border);
-      doc.setLineWidth(0.2);
-      try {
-        const fmt = p.image.startsWith('data:image/png')?'PNG':'JPEG';
-        doc.addImage(p.image, fmt, cx+2, ry, imgW, imgBoxH, undefined, 'MEDIUM');
-        doc.rect(cx+2, ry, imgW, imgBoxH, 'S');
-      } catch(e) {
-        doc.rect(cx+2, ry, imgW, imgBoxH, 'S');
-        setFont(7,'normal',C.text3);
-        doc.text('No Image', cx+2+imgW/2, ry+imgBoxH/2, {align:'center'});
-      }
-
-      // Details grid on the RIGHT
-      const dx = cx + imgW + 4;
-      const dw = cw - imgW - 6;
-      const rows = [
-        ['Color',   p.color||'—'],
-        ['Ordered', (p.qty||'—')+' pairs'],
-        ['Received',ps.received+' pairs'],
-        ['Pending', ps.pending+' pairs'],
-      ];
-      rows.forEach((r, ri) => {
-        const rowY = ry + ri*8;
-        if(ri%2===1){doc.setFillColor(246,249,253);}else{doc.setFillColor(255,255,255);}
-        doc.rect(dx, rowY, dw, 8, 'F');
-        doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-        doc.line(dx, rowY+8, dx+dw, rowY+8);
-        setFont(7,'normal',C.text3);
-        doc.text(r[0], dx+2, rowY+5.5);
-        const valColor = r[0]==='Received'?C.green:r[0]==='Pending'&&ps.pending>0?C.amber:C.text;
-        setFont(7,'bold',valColor);
-        doc.text(String(r[1]), dx+dw-2, rowY+5.5, {align:'right'});
-      });
-      // vertical divider between image and grid
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.2);
-      doc.line(dx-1, ry, dx-1, ry+imgBoxH);
-      ry += imgBoxH + 2;
-    } else {
-      // No image — full-width 2-column grid
-      const cols = [
-        ['Color',    p.color||'—',     'Ordered', (p.qty||'—')+' pairs'],
-        ['Received', ps.received+' pairs', 'Pending', ps.pending+' pairs'],
-      ];
-      const hw = cw/2;
-      cols.forEach((row, ri) => {
-        const rowY = ry + ri*8;
-        if(ri%2===0){doc.setFillColor(255,255,255);}else{doc.setFillColor(246,249,253);}
-        doc.rect(cx, rowY, cw, 8, 'F');
-        doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-        doc.line(cx, rowY+8, cx+cw, rowY+8);
-        doc.line(cx+hw, rowY, cx+hw, rowY+8); // vertical mid divider
-
-        setFont(7,'normal',C.text3); doc.text(row[0], cx+2, rowY+5.5);
-        const v1Color = row[0]==='Received'?C.green:row[0]==='Pending'&&ps.pending>0?C.amber:C.text;
-        setFont(7,'bold',v1Color); doc.text(row[1], cx+hw-2, rowY+5.5, {align:'right'});
-
-        setFont(7,'normal',C.text3); doc.text(row[2], cx+hw+2, rowY+5.5);
-        const v2Color = row[2]==='Received'?C.green:row[2]==='Pending'&&ps.pending>0?C.amber:C.text;
-        setFont(7,'bold',v2Color); doc.text(row[3], cx+cw-2, rowY+5.5, {align:'right'});
-      });
-      ry += 18;
-    }
-
-    // ── Sizes row ──
+    // ── SIZES — large and prominent (most important field) ──
     if (p.sizes) {
-      doc.setFillColor(246,249,253);
-      doc.rect(cx, ry, cw, 8, 'F');
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-      doc.line(cx, ry+8, cx+cw, ry+8);
-      setFont(7,'normal',C.text3); doc.text('Sizes', cx+2, ry+5.5);
-      setFont(7,'bold',C.text);
-      const sizeTxt = doc.splitTextToSize(p.sizes, cw-30);
-      doc.text(sizeTxt[0]||'', cx+cw-2, ry+5.5, {align:'right'});
-      ry += 8;
+      doc.setFillColor(...C.purpleL);
+      doc.setDrawColor(...C.purple); doc.setLineWidth(0.3);
+      const sizeTxt = doc.splitTextToSize(p.sizes, cw-8);
+      const sizeBoxH = Math.max(10, sizeTxt.length*5.5 + 5);
+      doc.roundedRect(cx, y, cw, sizeBoxH, 1.5, 1.5, 'FD');
+      setFont(7,'bold',C.purple);
+      doc.text('SIZES REQUIRED', cx+3, y+5);
+      setFont(9,'bold',C.text);
+      doc.text(sizeTxt, cx+3, y+5+5.5);
+      y += sizeBoxH + 3;
     }
 
-    // ── Priority row ──
-    if (p.priority) {
-      const priColor = {Low:C.green, Medium:C.amber, High:C.red}[p.priority];
-      doc.setFillColor(246,249,253);
-      doc.rect(cx, ry, cw, 8, 'F');
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-      doc.line(cx, ry+8, cx+cw, ry+8);
-      setFont(7,'normal',C.text3); doc.text('Priority', cx+2, ry+5.5);
-      doc.setFillColor(...priColor);
-      doc.roundedRect(cx+cw-22, ry+1.5, 20, 5, 1.5, 1.5, 'F');
-      setFont(7,'bold',[255,255,255]); doc.text(p.priority, cx+cw-12, ry+5.5, {align:'center'});
-      ry += 8;
+    // ── Qty row: Ordered / Received / Pending + Color + Priority ──
+    const qBoxH = 11;
+    doc.setFillColor(246,249,253);
+    doc.setDrawColor(...C.border); doc.setLineWidth(0.3);
+    doc.rect(cx, y, cw, qBoxH, 'FD');
+    const qcol = cw/3;
+    doc.line(cx+qcol, y, cx+qcol, y+qBoxH);
+    doc.line(cx+qcol*2, y, cx+qcol*2, y+qBoxH);
+
+    setFont(7,'normal',C.text3); doc.text('ORDERED', cx+qcol/2, y+4, {align:'center'});
+    setFont(10,'bold',C.text); doc.text(String(ps.ordered||'—')+' pr', cx+qcol/2, y+9, {align:'center'});
+
+    setFont(7,'normal',C.text3); doc.text('RECEIVED', cx+qcol+qcol/2, y+4, {align:'center'});
+    setFont(10,'bold',C.green); doc.text(String(ps.received)+' pr', cx+qcol+qcol/2, y+9, {align:'center'});
+
+    setFont(7,'normal',C.text3); doc.text('PENDING', cx+qcol*2+qcol/2, y+4, {align:'center'});
+    setFont(10,'bold', ps.pending>0?C.amber:C.text3); doc.text(String(ps.pending)+' pr', cx+qcol*2+qcol/2, y+9, {align:'center'});
+    y += qBoxH + 3;
+
+    // ── Color + Priority single line ──
+    if (p.color || p.priority) {
+      setFont(8,'normal',C.text2);
+      let lineTxt = '';
+      if (p.color) lineTxt += 'Color: ' + p.color;
+      doc.text(lineTxt, cx, y+4);
+      if (p.priority) {
+        const priColor = {Low:C.green, Medium:C.amber, High:C.red}[p.priority];
+        const pw = 20;
+        doc.setFillColor(...priColor);
+        doc.roundedRect(cx+cw-pw, y, pw, 5.5, 1.5, 1.5, 'F');
+        setFont(7,'bold',[255,255,255]);
+        doc.text(p.priority, cx+cw-pw/2, y+4, {align:'center'});
+      }
+      y += 8;
     }
 
-    // ── Notes row ──
+    // ── Notes (only if present, short) ──
     if (p.notes) {
-      const noteTxt = doc.splitTextToSize(p.notes, cw-20);
-      const noteH = noteTxt.length * 4.5 + 5;
-      doc.setFillColor(255,253,235);
-      doc.rect(cx, ry, cw, noteH, 'F');
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-      doc.line(cx, ry+noteH, cx+cw, ry+noteH);
-      setFont(7,'normal',C.text3); doc.text('Notes', cx+2, ry+5.5);
-      setFont(7,'normal',C.text2); doc.text(noteTxt, cx+18, ry+5.5);
-      ry += noteH;
+      setFont(7,'italic',C.text2);
+      const noteTxt = doc.splitTextToSize('Note: '+p.notes, cw);
+      doc.text(noteTxt, cx, y+4);
+      y += noteTxt.length*4.5 + 3;
     }
 
-    // ── Delivery table ──
+    // ── Delivery history (compact, only date+qty) ──
     if (delivs.length) {
-      // Table header
-      doc.setFillColor(...C.greenL);
-      doc.rect(cx, ry, cw, 7, 'F');
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-      doc.line(cx, ry+7, cx+cw, ry+7);
-
-      const col1=cw*0.38, col2=cw*0.22, col3=cw*0.40;
-      setFont(7,'bold',C.green);
-      doc.text('Date', cx+2, ry+5);
-      doc.text('Qty', cx+col1+2, ry+5);
-      doc.text('Note', cx+col1+col2+2, ry+5);
-      // column dividers in header
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-      doc.line(cx+col1, ry, cx+col1, ry+7);
-      doc.line(cx+col1+col2, ry, cx+col1+col2, ry+7);
-      ry += 7;
-
-      delivs.forEach((d, di) => {
-        const rowH = 7;
-        if(di%2===0){doc.setFillColor(255,255,255);}else{doc.setFillColor(246,249,253);}
-        doc.rect(cx, ry, cw, rowH, 'F');
-        doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-        doc.line(cx, ry+rowH, cx+cw, ry+rowH);
-        doc.line(cx+col1, ry, cx+col1, ry+rowH);
-        doc.line(cx+col1+col2, ry, cx+col1+col2, ry+rowH);
-
-        setFont(7,'normal',C.text); doc.text(fmtDate(d.date), cx+2, ry+5);
-        setFont(7,'bold',C.green);  doc.text('+'+d.qty+' pr', cx+col1+2, ry+5);
-        setFont(7,'normal',C.text2);
-        const noteTxt = doc.splitTextToSize(d.note||'—', col3-4);
-        doc.text(noteTxt[0]||'—', cx+col1+col2+2, ry+5);
-        ry += rowH;
-      });
-    } else {
-      doc.setFillColor(250,250,252);
-      doc.rect(cx, ry, cw, 7, 'F');
-      doc.setDrawColor(...C.border); doc.setLineWidth(0.15);
-      doc.line(cx, ry+7, cx+cw, ry+7);
-      setFont(7,'italic',C.text3);
-      doc.text('No deliveries recorded yet', cx+cw/2, ry+5, {align:'center'});
-      ry += 7;
+      setFont(7,'bold',C.text3);
+      doc.text('DELIVERIES:', cx, y+4);
+      let dtxt = delivs.map(d => fmtDate(d.date)+' (+'+d.qty+')').join('   ');
+      setFont(7,'normal',C.text2);
+      const dLines = doc.splitTextToSize(dtxt, cw-24);
+      doc.text(dLines, cx+24, y+4);
+      y += Math.max(5, dLines.length*4) + 4;
     }
 
-    // outer card border on top of everything
-    doc.setDrawColor(...C.border); doc.setLineWidth(0.4);
-    doc.roundedRect(cx, y, cw, cardH, 2, 2, 'S');
-
-    y = ry + 6;
+    // separator line between products on same page
+    if (i % 2 === 0 && i < prods.length-1) {
+      doc.setDrawColor(...C.border); doc.setLineWidth(0.5);
+      doc.line(cx, y, cx+cw, y);
+      y += 6;
+    }
   }
-
-  // ════════════════════════════════
-  // FOOTER SUMMARY BOX
-  // ════════════════════════════════
-  checkPage(22);
-  doc.setFillColor(...C.hdr);
-  doc.roundedRect(M, y, W-2*M, 18, 2, 2, 'F');
-  setFont(9,'bold',[255,255,255]);
-  doc.text('Order Summary', M+4, y+7);
-  setFont(8,'normal',[180,196,216]);
-  doc.text(`${prods.length} products  ·  ${totOrd} pairs ordered  ·  ${totRec} received  ·  ${totPend} pending`, M+4, y+14);
 
   // ── Page numbers ──
   const pages = doc.internal.getNumberOfPages();
   for (let pg=1; pg<=pages; pg++) {
     doc.setPage(pg);
     setFont(7,'normal',C.text3);
-    doc.text('BLUEDOL Order System', M, H-4);
+    doc.text('BLUEDOL', M, H-4);
     doc.text(`${pg} / ${pages}`, W-M, H-4, {align:'right'});
   }
 
